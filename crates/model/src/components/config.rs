@@ -448,12 +448,14 @@ impl<'a, RT: Runtime> ComponentConfigModel<'a, RT> {
                     let component_type = match parent_and_name {
                         None => {
                             anyhow::ensure!(new_node.args.is_empty());
+                            anyhow::ensure!(new_node.env.is_empty());
                             ComponentType::App
                         },
                         Some((parent, name)) => ComponentType::ChildComponent {
                             parent,
                             name,
                             args: new_node.args.clone(),
+                            env: new_node.env.clone(),
                         },
                     };
                     Ok(ComponentMetadata {
@@ -783,6 +785,7 @@ impl<'a, RT: Runtime> ComponentConfigModel<'a, RT> {
                             http_mounts: BTreeMap::new(),
                             http_prefix: None,
                             exports: BTreeMap::new(),
+                            env_vars: BTreeMap::new(),
                         },
                     )
                     .await?;
