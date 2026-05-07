@@ -182,9 +182,17 @@ impl<RT: Runtime> Application<RT> {
             app_functions,
         } = self.evaluate_push_contents(config).await?;
 
-        let schema_change = self
-            .handle_schema_change_in_start_push(&app, &evaluated_components)
+        let mut schema_change = self
+            .handle_schema_change_in_start_push(&app, &evaluated_components, config.dry_run)
             .await?;
+        if config.dry_run {
+            // Compute index diffs in a throwaway transaction so they're returned in
+            // the response but not committed as pending indexes.
+            let dry_run_schema_change = self
+                .handle_schema_change_read_only(&app, &evaluated_components)
+                .await?;
+            schema_change.index_diffs = dry_run_schema_change.index_diffs;
+        }
         self.database
             .load_indexes_into_memory(btreeset! { SCHEMAS_TABLE.clone() })
             .await?;
@@ -320,9 +328,8 @@ impl<RT: Runtime> Application<RT> {
         &self,
         app: &CheckedComponent,
         evaluated_components: &BTreeMap<ComponentDefinitionPath, EvaluatedComponentDefinition>,
+        skip_index_diff: bool,
     ) -> anyhow::Result<SchemaChange> {
-        // Even in dry run mode, we need to commit the schema changes so that
-        // wait_for_schema can validate the schema against existing data.
         let (_ts, schema_change) = self
             .execute_with_occ_retries(
                 Identity::system(),
@@ -331,7 +338,11 @@ impl<RT: Runtime> Application<RT> {
                 |tx| {
                     async move {
                         let schema_change = ComponentConfigModel::new(tx)
-                            .start_component_schema_changes(app, evaluated_components)
+                            .start_component_schema_changes(
+                                app,
+                                evaluated_components,
+                                skip_index_diff,
+                            )
                             .await?;
                         Ok(schema_change)
                     }
@@ -343,14 +354,14 @@ impl<RT: Runtime> Application<RT> {
     }
 
     #[fastrace::trace]
-    async fn handle_schema_change_in_evaluate_push(
+    async fn handle_schema_change_read_only(
         &self,
         app: &CheckedComponent,
         evaluated_components: &BTreeMap<ComponentDefinitionPath, EvaluatedComponentDefinition>,
     ) -> anyhow::Result<SchemaChange> {
         let mut tx = self.begin(Identity::system()).await?;
         let schema_change = ComponentConfigModel::new(&mut tx)
-            .start_component_schema_changes(app, evaluated_components)
+            .start_component_schema_changes(app, evaluated_components, false)
             .await?;
         drop(tx);
         Ok(schema_change)
@@ -530,7 +541,7 @@ impl<RT: Runtime> Application<RT> {
         } = self.evaluate_push_contents(config).await?;
 
         let schema_change = self
-            .handle_schema_change_in_evaluate_push(&app, &evaluated_components)
+            .handle_schema_change_read_only(&app, &evaluated_components)
             .await?;
 
         Ok(EvaluatePushResponse { schema_change })
@@ -995,6 +1006,9 @@ pub struct StartPushRequest {
 
     pub node_version: Option<String>,
 
+    #[serde(default)]
+    pub dry_run: bool,
+
     /// Indicates that this request is only for codegen and isn't initiating a
     /// full mutiphase push.
     #[serde(default)]
@@ -1032,6 +1046,7 @@ impl StartPushRequest {
                 .map(NodeDependency::from)
                 .collect(),
             node_version,
+            dry_run: self.dry_run,
             for_codegen: self.for_codegen,
         })
     }
