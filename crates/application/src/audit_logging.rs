@@ -96,12 +96,7 @@ impl AuditLogClient {
             return Ok(());
         };
 
-        let records = logs
-            .logs
-            .into_iter()
-            .map(|l| serde_json::to_string(&l.into_value()))
-            .collect::<Result<Vec<String>, _>>()?;
-
+        let records = logs.to_json_strings()?;
         firehose_client.send(records).await?;
 
         Ok(())
@@ -123,6 +118,10 @@ impl AuditLogFirehoseClient {
     }
 
     async fn send(&self, records: Vec<String>) -> anyhow::Result<()> {
+        if records.is_empty() {
+            return Ok(());
+        }
+
         let records = records
             .into_iter()
             .map(|record| {

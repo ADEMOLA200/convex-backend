@@ -84,6 +84,15 @@ pub struct ResolvedAuditLogLines {
     pub timestamp: UnixTimestamp,
 }
 
+impl ResolvedAuditLogLines {
+    pub fn to_json_strings(self) -> anyhow::Result<Vec<String>> {
+        self.logs
+            .into_iter()
+            .map(|l| serde_json::to_string(&l.into_value()).map_err(anyhow::Error::from))
+            .collect()
+    }
+}
+
 /// A resolved audit log line whose body has all sentinel objects replaced
 /// with concrete values.
 #[derive(Clone, Debug)]
