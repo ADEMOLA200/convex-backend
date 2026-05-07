@@ -2,7 +2,6 @@ import { TeamResponse } from "generatedApi";
 import {
   CustomRoleResponse,
   RoleStatement,
-  RoleStatementAction,
 } from "@convex-dev/platform/managementApi";
 import { Sheet } from "@ui/Sheet";
 import { Callout } from "@ui/Callout";
@@ -28,10 +27,64 @@ import {
 import Editor, { BeforeMount, OnMount } from "@monaco-editor/react";
 import { editorOptions } from "@common/elements/ObjectEditor/ObjectEditor";
 import { useCurrentTheme } from "@common/lib/useCurrentTheme";
+import { ActionCategory, ACTIONS_BY_CATEGORY } from "./customRoleActions";
+import {
+  CUSTOM_ROLE_TEMPLATES,
+  CUSTOM_ROLE_TEMPLATES_BY_ID,
+} from "./customRoleTemplates";
 
-const EMPTY_STATEMENTS = "[\n  \n]";
+const BLANK_STATEMENT: RoleStatement = {
+  effect: "allow",
+  resource: "",
+  actions: [],
+};
 
 const STATEMENTS_EDITOR_PATH = "custom-role-statements.json";
+
+const STATEMENTS_PRINT_WIDTH = 160;
+const STATEMENTS_INDENT = "  ";
+
+function formatStatements(value: unknown): string {
+  return formatCompact(value, "");
+}
+
+function inlineFormat(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(inlineFormat).join(", ")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return "{}";
+    return `{ ${entries
+      .map(([k, v]) => `${JSON.stringify(k)}: ${inlineFormat(v)}`)
+      .join(", ")} }`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+function formatCompact(value: unknown, currentIndent: string): string {
+  const inline = inlineFormat(value);
+  if (currentIndent.length + inline.length <= STATEMENTS_PRINT_WIDTH) {
+    return inline;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    const childIndent = currentIndent + STATEMENTS_INDENT;
+    const items = value.map((v) => childIndent + formatCompact(v, childIndent));
+    return `[\n${items.join(",\n")}\n${currentIndent}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return "{}";
+    const childIndent = currentIndent + STATEMENTS_INDENT;
+    const items = entries.map(
+      ([k, v]) =>
+        `${childIndent}${JSON.stringify(k)}: ${formatCompact(v, childIndent)}`,
+    );
+    return `{\n${items.join(",\n")}\n${currentIndent}}`;
+  }
+  return inline;
+}
 
 function errorMessage(e: unknown, fallback: string): string {
   if (
@@ -45,145 +98,6 @@ function errorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
-// Categories below match the (leaf, parent) pairs the server's
-// `RoleStatement::validate` enforces in
-// crates_private/big_brain_lib/src/roles/types.rs. Token actions split by
-// owner so e.g. `team:*:token:*` only allows team-token actions. The server
-// enforces this pairing too — this duplication just gives inline editor
-// feedback.
-type ActionCategory =
-  | "team"
-  | "project"
-  | "deployment"
-  | "member"
-  | "teamToken"
-  | "projectToken"
-  | "deploymentToken"
-  | "customRole"
-  | "billing"
-  | "oauthApplication"
-  | "sso"
-  | "integration"
-  | "defaultEnvironmentVariable";
-
-const ACTIONS_BY_CATEGORY: Record<ActionCategory, RoleStatementAction[]> = {
-  team: [
-    "updateTeam",
-    "deleteTeam",
-    "applyReferralCode",
-    "viewTeamAuditLog",
-    "viewUsage",
-  ],
-  billing: [
-    "updatePaymentMethod",
-    "updateBillingContact",
-    "updateBillingAddress",
-    "createSubscription",
-    "resumeSubscription",
-    "cancelSubscription",
-    "changeSubscriptionPlan",
-    "setSpendingLimit",
-    "viewBillingDetails",
-    "viewInvoices",
-  ],
-  oauthApplication: [
-    "createOAuthApplication",
-    "updateOAuthApplication",
-    "deleteOAuthApplication",
-    "viewOAuthApplications",
-    "generateOAuthClientSecret",
-  ],
-  sso: ["enableSSO", "disableSSO", "updateSSO", "viewSSO"],
-  integration: [
-    "viewTeamIntegrations",
-    "createTeamIntegrations",
-    "updateTeamIntegrations",
-    "deleteTeamIntegrations",
-    "viewTeamAuditLog",
-  ],
-  project: [
-    "createProject",
-    "transferProject",
-    "receiveProject",
-    "updateProject",
-    "deleteProject",
-    "viewProjects",
-    "updateMemberProjectRole",
-  ],
-  defaultEnvironmentVariable: [
-    "createProjectEnvironmentVariable",
-    "updateProjectEnvironmentVariable",
-    "deleteProjectEnvironmentVariable",
-    "viewProjectEnvironmentVariables",
-  ],
-  deployment: [
-    "createDeployment",
-    "receiveDeployment",
-    "transferDeployment",
-    "deleteDeployment",
-    "viewDeployments",
-    "updateDeploymentReference",
-    "updateDeploymentDashboardEditConfirmation",
-    "updateDeploymentExpiresAt",
-    "updateDeploymentSendLogsToClient",
-    "updateDeploymentClass",
-    "updateDeploymentIsDefault",
-    "updateDeploymentType",
-    "viewDeploymentIntegrations",
-    "writeDeploymentIntegrations",
-    "createCustomDomain",
-    "deleteCustomDomain",
-    "viewInsights",
-    "startManualCloudBackup",
-    "restoreFromCloudBackup",
-    "configurePeriodicBackup",
-    "disablePeriodicBackup",
-    "deleteCloudBackup",
-    "viewCloudBackups",
-    "downloadCloudBackups",
-    "deploy",
-    "pauseDeployment",
-    "unpauseDeployment",
-    "viewEnvironmentVariables",
-    "writeEnvironmentVariables",
-    "viewLogs",
-    "viewMetrics",
-    "viewAuditLog",
-    "viewData",
-    "writeData",
-    "actAsUser",
-    "runInternalQueries",
-    "runInternalMutations",
-    "runInternalActions",
-    "runTestQuery",
-  ],
-  member: [
-    "inviteMember",
-    "cancelMemberInvitation",
-    "removeMember",
-    "updateMemberRole",
-  ],
-  teamToken: [
-    "createTeamAccessToken",
-    "updateTeamAccessToken",
-    "deleteTeamAccessToken",
-    "viewTeamAccessTokens",
-  ],
-  projectToken: [
-    "createProjectAccessToken",
-    "updateProjectAccessToken",
-    "deleteProjectAccessToken",
-    "viewProjectAccessTokens",
-  ],
-  deploymentToken: [
-    "createDeploymentAccessToken",
-    "updateDeploymentAccessToken",
-    "deleteDeploymentAccessToken",
-    "viewDeploymentAccessTokens",
-  ],
-  customRole: ["viewCustomRoles"],
-};
-
 const actionsForCategory = (category: ActionCategory) => ({
   if: { type: "array" },
   then: {
@@ -193,13 +107,12 @@ const actionsForCategory = (category: ActionCategory) => ({
   else: { const: "*" },
 });
 
-// Mirrors ResourceSpecifier::FromStr in
-// crates_private/big_brain_lib/src/roles/parse.rs. Tokens nest directly under
-// their owning resource: `team:*:token:*`, `project:*:token:*`, or
-// `project:*:deployment:*:token:*`.
+// Tokens nest directly under their owning resource: `team:*:token:*`,
+// `project:*:token:*`, or `project:*:deployment:*:token:*`.
 const SELECTOR_VAL = "[^,:]+";
 const projectSel = `(\\*|id=${SELECTOR_VAL}|slug=${SELECTOR_VAL})`;
 const deploymentSel = `(\\*|id=${SELECTOR_VAL}|type=${SELECTOR_VAL}|creator=${SELECTOR_VAL})`;
+const memberSel = `(\\*|id=${SELECTOR_VAL})`;
 const tokenSel = `(\\*|creator=${SELECTOR_VAL})`;
 const csv = (sel: string) => `${sel}(,${sel})*`;
 const tokenTail = `:token:${csv(tokenSel)}`;
@@ -207,7 +120,7 @@ const projectTail = `(${tokenTail}|:deployment:${csv(deploymentSel)}(${tokenTail
 const RESOURCE_PATTERN =
   `^(team:\\*(${tokenTail})?` +
   `|project:${csv(projectSel)}${projectTail}?` +
-  `|member:\\*` +
+  `|member:${csv(memberSel)}` +
   `|customRole:\\*` +
   `|billing:\\*` +
   `|oauthApplication:\\*` +
@@ -370,23 +283,31 @@ const statementsSchema = {
 function CustomRoleForm({
   teamId,
   existingRole,
+  templateId,
   onClose,
   onSaved,
 }: {
   teamId: number;
   existingRole?: CustomRoleResponse;
+  templateId?: string;
   onClose: () => void;
   onSaved: (roleId: number) => void;
 }) {
-  const [name, setName] = useState(existingRole?.name ?? "");
+  const template =
+    !existingRole && templateId
+      ? CUSTOM_ROLE_TEMPLATES_BY_ID[templateId]
+      : undefined;
+  const [name, setName] = useState(
+    existingRole?.name ?? template?.defaultName ?? "",
+  );
   const [description, setDescription] = useState(
-    existingRole?.description ?? "",
+    existingRole?.description ?? template?.defaultRoleDescription ?? "",
   );
-  const [statementsText, setStatementsText] = useState(
-    existingRole
-      ? JSON.stringify(existingRole.statements, null, 2)
-      : EMPTY_STATEMENTS,
-  );
+  const [statementsText, setStatementsText] = useState(() => {
+    const initial = existingRole?.statements ??
+      template?.statements ?? [BLANK_STATEMENT];
+    return formatStatements(initial);
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const [nameError, setNameError] = useState<string>();
@@ -678,6 +599,10 @@ export function CustomRoles({ team }: { team: TeamResponse }) {
     ? roles?.find((r) => r.id.toString() === editingRoleId)
     : undefined;
   const isNewRole = router.query.new === "1";
+  const newRoleTemplateId =
+    typeof router.query.template === "string"
+      ? router.query.template
+      : undefined;
   const showForm = canManage && (isNewRole || editingRoleId !== undefined);
 
   const listHref = {
@@ -689,11 +614,15 @@ export function CustomRoles({ team }: { team: TeamResponse }) {
     void router.push(listHref, undefined, { shallow: true });
   };
 
-  const goToNew = () => {
+  const goToNew = (templateId?: string) => {
     void router.push(
       {
         pathname: "/t/[team]/settings/custom-roles",
-        query: { team: team.slug, new: "1" },
+        query: {
+          team: team.slug,
+          new: "1",
+          ...(templateId ? { template: templateId } : {}),
+        },
       },
       undefined,
       { shallow: true },
@@ -761,14 +690,38 @@ export function CustomRoles({ team }: { team: TeamResponse }) {
                   Custom roles let you define fine-grained permissions for your
                   team members.
                 </p>
-                <Button
-                  onClick={goToNew}
-                  icon={<PlusIcon />}
-                  disabled={!canManage}
-                  tip={disabledReason}
+                <Menu
+                  placement="bottom-end"
+                  buttonProps={{
+                    icon: <PlusIcon />,
+                    disabled: !canManage,
+                    tip: disabledReason,
+                    children: "Create Role",
+                  }}
                 >
-                  Create Role
-                </Button>
+                  {[
+                    <div
+                      key="__header__"
+                      className="mx-3 pb-1 text-xs text-content-secondary select-none"
+                    >
+                      Role Template
+                    </div>,
+                    ...CUSTOM_ROLE_TEMPLATES.map((t) => (
+                      <MenuItem
+                        key={t.id}
+                        action={() => goToNew(t.id)}
+                        tip={t.description}
+                        tipSide="left"
+                      >
+                        {t.label}
+                      </MenuItem>
+                    )),
+                    <hr key="__divider__" className="mx-3 my-1 border-t" />,
+                    <MenuItem key="__blank__" action={() => goToNew()}>
+                      Start without a template
+                    </MenuItem>,
+                  ]}
+                </Menu>
               </div>
               {roles === undefined ? (
                 <Loading fullHeight={false} className="h-14 w-full" />
@@ -814,6 +767,7 @@ export function CustomRoles({ team }: { team: TeamResponse }) {
                   key="custom-role-form"
                   teamId={team.id}
                   existingRole={editingRole}
+                  templateId={newRoleTemplateId}
                   onClose={goToList}
                   onSaved={goToEdit}
                 />
