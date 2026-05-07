@@ -48,12 +48,12 @@ const EDIT_DEPLOYMENT_ACTIONS: RoleStatementAction[] = [
   "runTestQuery",
   "createCustomDomain",
   "deleteCustomDomain",
-  "startManualCloudBackup",
-  "restoreFromCloudBackup",
-  "configurePeriodicBackup",
-  "disablePeriodicBackup",
-  "deleteCloudBackup",
-  "downloadCloudBackups",
+  "createBackups",
+  "importBackups",
+  "configurePeriodicBackups",
+  "disablePeriodicBackups",
+  "deleteBackups",
+  "downloadBackups",
 ];
 
 export const CUSTOM_ROLE_TEMPLATES: CustomRoleTemplate[] = [
