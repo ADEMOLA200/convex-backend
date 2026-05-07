@@ -1,5 +1,6 @@
 import { Button } from "@ui/Button";
 import { Combobox } from "@ui/Combobox";
+import { Link } from "@ui/Link";
 import { Menu, MenuItem } from "@ui/Menu";
 import { Modal } from "@ui/Modal";
 import { Tooltip } from "@ui/Tooltip";
@@ -7,7 +8,7 @@ import { Cross2Icon, PlusIcon } from "@radix-ui/react-icons";
 import { useMemo, useState } from "react";
 import sortBy from "lodash/sortBy";
 import type { CustomRoleResponse } from "@convex-dev/platform/managementApi";
-import type { TeamMember } from "generatedApi";
+import type { TeamMember, TeamResponse } from "generatedApi";
 
 type RoleChoice = "admin" | "developer" | "custom";
 
@@ -19,6 +20,7 @@ function sameIds(a: number[], b: number[]) {
 }
 
 export function EditTeamRoleDialog({
+  team,
   member,
   customRoles,
   customRolesEnabled,
@@ -26,6 +28,7 @@ export function EditTeamRoleDialog({
   onSave,
   onClose,
 }: {
+  team: TeamResponse;
   member: TeamMember;
   customRoles: CustomRoleResponse[];
   customRolesEnabled: boolean;
@@ -162,6 +165,17 @@ export function EditTeamRoleDialog({
         {choice === "custom" && (
           <div className="flex flex-col gap-1">
             <span className="text-sm text-content-primary">Custom roles</span>
+            <p className="mb-2 text-xs text-content-secondary">
+              Custom roles let you assign granular permissions to team members.
+              Manage them in{" "}
+              <Link
+                href={`/t/${team.slug}/settings/custom-roles`}
+                className="items-center"
+              >
+                Team Settings → Custom Roles
+              </Link>
+              .
+            </p>
             <div className="flex flex-wrap items-center gap-1.5">
               {selectedSorted.map((id) => {
                 const name = customRoleNameById.get(id) ?? `Role #${id}`;

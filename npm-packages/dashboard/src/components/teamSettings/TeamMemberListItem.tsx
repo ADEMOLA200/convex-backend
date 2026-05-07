@@ -196,6 +196,7 @@ export function TeamMemberListItem({
         )}
         {showEditRole && (
           <EditTeamRoleDialog
+            team={team}
             member={member}
             customRoles={customRoles}
             customRolesEnabled={customRolesEnabled}
