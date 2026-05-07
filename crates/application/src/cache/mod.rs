@@ -510,7 +510,7 @@ impl<RT: Runtime> CacheManager<RT> {
                 )
                 .await;
 
-            let vars = AuditLogVars::from_context(context, &self.rt);
+            let vars = AuditLogVars::from_context(context, &self.rt)?;
             self.audit_log_client
                 .send_logs(cache_result.outcome.audit_log_lines.resolve_bodies(&vars)?)
                 .await?;

@@ -764,7 +764,7 @@ impl<RT: Runtime> ApplicationFunctionRunner<RT> {
                 context.clone(),
             )
             .await;
-        let vars = AuditLogVars::from_context(context, &self.runtime);
+        let vars = AuditLogVars::from_context(context, &self.runtime)?;
         self.audit_log_client
             .send_logs(outcome.audit_log_lines.resolve_bodies(&vars)?)
             .await?;
@@ -1135,7 +1135,7 @@ impl<RT: Runtime> ApplicationFunctionRunner<RT> {
             _ => anyhow::bail!("Received non-mutation outcome for mutation"),
         };
 
-        let vars = AuditLogVars::from_context(context, &self.runtime);
+        let vars = AuditLogVars::from_context(context, &self.runtime)?;
         self.audit_log_client
             .send_logs(mutation_outcome.audit_log_lines.resolve_bodies(&vars)?)
             .await?;

@@ -236,6 +236,28 @@ pub static FUNCTION_LIMIT_WARNING_RATIO: LazyLock<f64> = LazyLock::new(|| {
     env_config("FUNCTION_LIMIT_WARNING_RATIO", 0.8) // 80%
 });
 
+/// Maximum size in bytes of a single audit log line's serialized JSON body.
+pub static AUDIT_LOG_MAX_LINE_SIZE_BYTES: LazyLock<usize> = LazyLock::new(|| {
+    env_config("AUDIT_LOG_MAX_LINE_SIZE_BYTES", 100_000) // 100 KB
+});
+
+/// Maximum total size in bytes of all audit log lines emitted in a single
+/// function execution, including audit logs from nested function calls.
+pub static AUDIT_LOG_MAX_TOTAL_SIZE_BYTES: LazyLock<usize> = LazyLock::new(|| {
+    env_config("AUDIT_LOG_MAX_TOTAL_SIZE_BYTES", 4_000_000) // 4 MB
+});
+
+/// Maximum number of audit log lines that can be emitted in a single function
+/// execution, including audit logs from nested function calls.
+pub static AUDIT_LOG_MAX_LINES: LazyLock<usize> =
+    LazyLock::new(|| env_config("AUDIT_LOG_MAX_LINES", 500));
+
+/// Maximum heap size in bytes that audit log lines accumulated during a single
+/// function execution may occupy.
+pub static AUDIT_LOG_MAX_HEAP_SIZE_BYTES: LazyLock<usize> = LazyLock::new(|| {
+    env_config("AUDIT_LOG_MAX_HEAP_SIZE_BYTES", 4_000_000) // 4 MB
+});
+
 /// We might generate a number of system documents for each UDF write. For
 /// example, creating 4000 user documents in new tables, might result in adding
 /// an additional 8000 system documents. If we hit this error, this is a system
